@@ -15,6 +15,7 @@ import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
 import org.sakaiproject.nakamura.api.lite.authorizable.User;
 import org.sakaiproject.nakamura.api.user.LiteAuthorizablePostProcessService;
 import org.sakaiproject.nakamura.api.user.UserConstants;
+import org.sakaiproject.nakamura.util.parameters.ParameterMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +96,7 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
       authorizableManager.createUser(userId, userId, null, b.build());
       user = (User) authorizableManager.findAuthorizable(userId);
       // we may need to adjust the properties here to create the rest of the information.
-      postProcessorService.process(user, session, ModificationType.CREATE, request);
+      postProcessorService.process(user, session, ModificationType.CREATE, ParameterMap.extractParameters(request));
       authorizableManager.updateAuthorizable(user);
     } else {
       User user = (User) authorizableManager.findAuthorizable(userId);
