@@ -73,7 +73,7 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
         return;
       }
 
-      response.setStatus(acceptTerms(session, request, userId,
+      response.setStatus(acceptTerms(request, userId,
           request.getParameter("gn"), request.getParameter("sn")));
     } catch (Exception e) {
       LOGGER.error(e.getMessage(), e);
@@ -82,35 +82,34 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
 
   }
 
-  private int acceptTerms(Session session, SlingHttpServletRequest request,
+  private int acceptTerms(SlingHttpServletRequest request,
       String userId, String firstName, String lastName) throws Exception {
-    AuthorizableManager authorizableManager = session.getAuthorizableManager();
-    User user = (User) authorizableManager.findAuthorizable(userId);
-    if (user == null ) {
       Session adminSession = repository.loginAdministrative();
-      try {
-          AuthorizableManager adminAuthorizableManager = adminSession.getAuthorizableManager();
+    AuthorizableManager authorizableManager = adminSession.getAuthorizableManager();
+    try {
+        User user = (User) authorizableManager.findAuthorizable(userId);
+        if (user == null ) {
           Builder<String, Object> b = ImmutableMap.builder();
           b.put("hasacceptedterms", true);
           b.put("whenacceptedterms", new Date().toString());
           b.put(UserConstants.USER_FIRSTNAME_PROPERTY, firstName);
           b.put(UserConstants.USER_LASTNAME_PROPERTY, lastName);
-          adminAuthorizableManager.createUser(userId, userId, null, b.build());
-          user = (User) adminAuthorizableManager.findAuthorizable(userId);
+          authorizableManager.createUser(userId, userId, null, b.build());
+          user = (User) authorizableManager.findAuthorizable(userId);
           // we may need to adjust the properties here to create the rest of the information.
           postProcessorService.process(user, adminSession, ModificationType.CREATE, ParameterMap.extractParameters(request));
-          adminAuthorizableManager.updateAuthorizable(user);
-      } finally {
-          adminSession.logout();
-      }
-    } else {
-      user.setProperty("hasacceptedterms", true);
-      user.setProperty("whenacceptedterms", new Date().toString());
-      user.setProperty(UserConstants.USER_FIRSTNAME_PROPERTY, firstName);
-      user.setProperty(UserConstants.USER_LASTNAME_PROPERTY, lastName);
-      authorizableManager.updateAuthorizable(user);
+          authorizableManager.updateAuthorizable(user);
+        } else {
+          user.setProperty("hasacceptedterms", true);
+          user.setProperty("whenacceptedterms", new Date().toString());
+          user.setProperty(UserConstants.USER_FIRSTNAME_PROPERTY, firstName);
+          user.setProperty(UserConstants.USER_LASTNAME_PROPERTY, lastName);
+          authorizableManager.updateAuthorizable(user);
+        }
+        return 200;
+    } finally {
+        adminSession.logout();
     }
-    return 200;
   }
 
 }
