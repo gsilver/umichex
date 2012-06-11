@@ -62,9 +62,7 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
       Session session = StorageClientUtils.adaptToSession(request.getResourceResolver()
           .adaptTo(javax.jcr.Session.class));
       String userId = trustedProxy.getUserIdFromProxy(request);
-      boolean create = true;
       if (userId == null) {
-        create = false;
         userId = session.getUserId();
         if (User.ADMIN_USER.equals(userId)) {
           userId = request.getParameter("uid");
@@ -76,7 +74,7 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
       }
 
       response.setStatus(acceptTerms(session, request, userId,
-          request.getParameter("gn"), request.getParameter("sn"), create));
+          request.getParameter("gn"), request.getParameter("sn")));
     } catch (Exception e) {
       LOGGER.error(e.getMessage(), e);
       throw new ServletException(e.getMessage(), e);
@@ -85,34 +83,27 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
   }
 
   private int acceptTerms(Session session, SlingHttpServletRequest request,
-      String userId, String firstName, String lastName, boolean create) throws Exception {
-    if (create) {
+      String userId, String firstName, String lastName) throws Exception {
+    AuthorizableManager authorizableManager = session.getAuthorizableManager();
+    User user = (User) authorizableManager.findAuthorizable(userId);
+    if (user == null ) {
       Session adminSession = repository.loginAdministrative();
       try {
-          AuthorizableManager authorizableManager = adminSession.getAuthorizableManager();
-          User user = (User) authorizableManager.findAuthorizable(userId);
-          if (user != null) {
-            return 409;
-          }
+          AuthorizableManager adminAuthorizableManager = adminSession.getAuthorizableManager();
           Builder<String, Object> b = ImmutableMap.builder();
           b.put("hasacceptedterms", true);
           b.put("whenacceptedterms", new Date().toString());
           b.put(UserConstants.USER_FIRSTNAME_PROPERTY, firstName);
           b.put(UserConstants.USER_LASTNAME_PROPERTY, lastName);
-          authorizableManager.createUser(userId, userId, null, b.build());
-          user = (User) authorizableManager.findAuthorizable(userId);
+          adminAuthorizableManager.createUser(userId, userId, null, b.build());
+          user = (User) adminAuthorizableManager.findAuthorizable(userId);
           // we may need to adjust the properties here to create the rest of the information.
           postProcessorService.process(user, adminSession, ModificationType.CREATE, ParameterMap.extractParameters(request));
-          authorizableManager.updateAuthorizable(user);
+          adminAuthorizableManager.updateAuthorizable(user);
       } finally {
           adminSession.logout();
       }
     } else {
-      AuthorizableManager authorizableManager = session.getAuthorizableManager();
-      User user = (User) authorizableManager.findAuthorizable(userId);
-      if (user == null) {
-        return 404;
-      }
       user.setProperty("hasacceptedterms", true);
       user.setProperty("whenacceptedterms", new Date().toString());
       user.setProperty(UserConstants.USER_FIRSTNAME_PROPERTY, firstName);
