@@ -102,7 +102,7 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
           authorizableManager.createUser(userId, userId, null, b.build());
           user = (User) authorizableManager.findAuthorizable(userId);
           // we may need to adjust the properties here to create the rest of the information.
-          postProcessorService.process(user, session, ModificationType.CREATE, ParameterMap.extractParameters(request));
+          postProcessorService.process(user, adminSession, ModificationType.CREATE, ParameterMap.extractParameters(request));
           authorizableManager.updateAuthorizable(user);
       } finally {
           adminSession.logout();
