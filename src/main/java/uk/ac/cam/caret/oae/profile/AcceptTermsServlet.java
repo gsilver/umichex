@@ -9,6 +9,7 @@ import org.apache.sling.api.SlingHttpServletRequest;
 import org.apache.sling.api.SlingHttpServletResponse;
 import org.apache.sling.api.servlets.SlingAllMethodsServlet;
 import org.apache.sling.servlets.post.ModificationType;
+import org.sakaiproject.nakamura.api.lite.Repository;
 import org.sakaiproject.nakamura.api.lite.Session;
 import org.sakaiproject.nakamura.api.lite.StorageClientUtils;
 import org.sakaiproject.nakamura.api.lite.authorizable.AuthorizableManager;
@@ -46,6 +47,9 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
 
   @Reference
   private transient LiteAuthorizablePostProcessService postProcessorService;
+  
+  @Reference
+  private transient Repository repository;
 
   @Reference
   private TrustedProxy trustedProxy;
@@ -82,23 +86,29 @@ public class AcceptTermsServlet extends SlingAllMethodsServlet {
 
   private int acceptTerms(Session session, SlingHttpServletRequest request,
       String userId, String firstName, String lastName, boolean create) throws Exception {
-    AuthorizableManager authorizableManager = session.getAuthorizableManager();
     if (create) {
-      User user = (User) authorizableManager.findAuthorizable(userId);
-      if (user != null) {
-        return 409;
+      Session adminSession = repository.loginAdministrative();
+      try {
+          AuthorizableManager authorizableManager = adminSession.getAuthorizableManager();
+          User user = (User) authorizableManager.findAuthorizable(userId);
+          if (user != null) {
+            return 409;
+          }
+          Builder<String, Object> b = ImmutableMap.builder();
+          b.put("hasacceptedterms", true);
+          b.put("whenacceptedterms", new Date().toString());
+          b.put(UserConstants.USER_FIRSTNAME_PROPERTY, firstName);
+          b.put(UserConstants.USER_LASTNAME_PROPERTY, lastName);
+          authorizableManager.createUser(userId, userId, null, b.build());
+          user = (User) authorizableManager.findAuthorizable(userId);
+          // we may need to adjust the properties here to create the rest of the information.
+          postProcessorService.process(user, session, ModificationType.CREATE, ParameterMap.extractParameters(request));
+          authorizableManager.updateAuthorizable(user);
+      } finally {
+          adminSession.logout();
       }
-      Builder<String, Object> b = ImmutableMap.builder();
-      b.put("hasacceptedterms", true);
-      b.put("whenacceptedterms", new Date().toString());
-      b.put(UserConstants.USER_FIRSTNAME_PROPERTY, firstName);
-      b.put(UserConstants.USER_LASTNAME_PROPERTY, lastName);
-      authorizableManager.createUser(userId, userId, null, b.build());
-      user = (User) authorizableManager.findAuthorizable(userId);
-      // we may need to adjust the properties here to create the rest of the information.
-      postProcessorService.process(user, session, ModificationType.CREATE, ParameterMap.extractParameters(request));
-      authorizableManager.updateAuthorizable(user);
     } else {
+      AuthorizableManager authorizableManager = session.getAuthorizableManager();
       User user = (User) authorizableManager.findAuthorizable(userId);
       if (user == null) {
         return 404;
